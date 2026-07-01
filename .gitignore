@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Build-artefacten van de extensie (worden door `vsce package` gegenereerd)
+*.vsix
+
+# Geheimen / lokale omgeving — NOOIT committen
+.env
+.env.*
+*.key
+*.pem
+secrets.json
+
+# Lokale tooling / editor
+.claude/
+.DS_Store
+*.log
+
+# Runtime-data van de server die door beheerders lokaal gevuld wordt
+# (de meegeleverde seed staat wel in git: server/data/assignments.json)
+server/data/*.local.json

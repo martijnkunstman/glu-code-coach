@@ -1,0 +1,4 @@
+{
+  "// dev": "Tijdens ontwikkelen praat de coach met je lokale server i.p.v. productie.",
+  "studentCoach.apiBaseUrl": "http://localhost:3000/glu/embeddedcodingcoach"
+}

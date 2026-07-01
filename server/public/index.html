@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GLU Coding Coach · Opdrachtenbeheer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="dashboard.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">&lt;/&gt;</div>
+      <div class="brand-text">
+        <strong>Coding Coach</strong>
+        <span>GLU · Opdrachtenbeheer</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span id="status" class="status">verbinden…</span>
+      <button id="exportBtn" class="btn btn-ghost" title="Alle opdrachten downloaden als JSON">Export</button>
+      <button id="importBtn" class="btn btn-ghost" title="Opdrachten importeren uit JSON">Import</button>
+      <input id="importFile" type="file" accept="application/json" hidden />
+      <button id="logoutBtn" class="btn btn-ghost" hidden>Uitloggen</button>
+      <button id="newBtn" class="btn btn-primary">+ Nieuwe opdracht</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel list-panel">
+      <div class="list-head">
+        <input id="search" class="search" type="search" placeholder="Zoek opdrachten…" />
+      </div>
+      <div id="list" class="list"></div>
+    </section>
+
+    <section class="panel editor-panel">
+      <form id="form" class="editor" autocomplete="off">
+        <div class="editor-head">
+          <h2 id="editorTitle">Nieuwe opdracht</h2>
+          <span id="editorMeta" class="editor-meta"></span>
+        </div>
+
+        <label class="field">
+          <span class="label">Titel</span>
+          <input id="title" name="title" class="input" placeholder="Bijv. Palindroomchecker" required />
+        </label>
+
+        <div class="row">
+          <label class="field">
+            <span class="label">Programmeertaal</span>
+            <select id="language" name="language" class="input">
+              <option value="python">Python</option>
+              <option value="javascript">JavaScript</option>
+              <option value="java">Java</option>
+              <option value="html">HTML</option>
+              <option value="css">CSS</option>
+              <option value="csharp">C#</option>
+              <option value="php">PHP</option>
+              <option value="sql">SQL</option>
+              <option value="overig">Overig</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="label">Niveau</span>
+            <select id="level" name="level" class="input">
+              <option value="beginner">Beginner</option>
+              <option value="gemiddeld">Gemiddeld</option>
+              <option value="gevorderd">Gevorderd</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="field">
+          <span class="label">Omschrijving van de opdracht</span>
+          <textarea id="description" name="description" class="input" rows="4" placeholder="Wat moet de student maken? Beschrijf het probleem, niet de oplossing."></textarea>
+        </label>
+
+        <label class="field">
+          <span class="label">Leerdoelen <span class="hint-note">één per regel</span></span>
+          <textarea id="learningGoals" name="learningGoals" class="input" rows="3" placeholder="functies definiëren&#10;strings bewerken&#10;waarden vergelijken"></textarea>
+        </label>
+
+        <label class="field">
+          <span class="label">
+            Hint-ladder <span class="hint-note">één hint per regel — van vaag naar concreter. De coach geeft ze stapsgewijs, nóóit de oplossing.</span>
+          </span>
+          <textarea id="hints" name="hints" class="input" rows="4" placeholder="Wat betekent het begrip precies?&#10;Welke stap zou als eerste moeten gebeuren?&#10;Hoe zou je dat in code uitdrukken?"></textarea>
+        </label>
+
+        <fieldset class="group">
+          <legend>Automatisch toetsen <span class="hint-note">optioneel — hiermee kan de student in de IDE op “Toets mijn code” klikken</span></legend>
+          <div class="row">
+            <label class="field">
+              <span class="label">Functienaam</span>
+              <input id="functionName" name="functionName" class="input mono" placeholder="bijv. is_palindroom" />
+            </label>
+            <div class="field test-count-wrap">
+              <span class="label">Herkende testgevallen</span>
+              <span id="testCount" class="test-count">0</span>
+            </div>
+          </div>
+          <label class="field">
+            <span class="label">Testgevallen <span class="hint-note">één per regel: <code>[argumenten] =&gt; verwacht</code> (JSON). Bijv. <code>["racecar"] =&gt; true</code></span></span>
+            <textarea id="tests" name="tests" class="input mono" rows="4" placeholder='["racecar"] => true&#10;["lepel"] => false&#10;[15] => "FizzBuzz"'></textarea>
+          </label>
+        </fieldset>
+
+        <label class="field">
+          <span class="label">Startcode <span class="hint-note">optioneel — wordt aan de student getoond</span></span>
+          <textarea id="starterCode" name="starterCode" class="input mono" rows="4" placeholder="def is_palindroom(tekst):&#10;    pass"></textarea>
+        </label>
+
+        <label class="field coach-only">
+          <span class="label">
+            🔒 Oplossingsnotities voor de coach <span class="hint-note">Wordt NOOIT aan de student getoond. Helpt de coach betere hints geven (aanpak, veelgemaakte fouten).</span>
+          </span>
+          <textarea id="solutionNotes" name="solutionNotes" class="input" rows="3" placeholder="Verwachte aanpak en veelgemaakte fouten…"></textarea>
+        </label>
+
+        <div class="editor-actions">
+          <button type="submit" class="btn btn-primary" id="saveBtn">Opslaan</button>
+          <button type="button" class="btn btn-ghost" id="duplicateBtn" hidden>Dupliceren</button>
+          <button type="button" class="btn btn-ghost" id="deleteBtn" hidden>Verwijderen</button>
+          <button type="button" class="btn btn-ghost" id="cancelBtn">Leegmaken</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <!-- Login -->
+  <div id="loginOverlay" class="overlay" hidden>
+    <form id="loginForm" class="login-card">
+      <div class="brand-mark big">&lt;/&gt;</div>
+      <h2>Docent inloggen</h2>
+      <p class="muted">Voer het wachtwoord in om opdrachten te beheren.</p>
+      <input id="loginPassword" type="password" class="input" placeholder="Wachtwoord" autocomplete="current-password" />
+      <button type="submit" class="btn btn-primary">Inloggen</button>
+      <p id="loginError" class="login-error" hidden>Onjuist wachtwoord.</p>
+    </form>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="dashboard.js"></script>
+</body>
+</html>

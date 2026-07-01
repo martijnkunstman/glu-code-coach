@@ -1,0 +1,101 @@
+[
+  {
+    "id": "seed-palindroom",
+    "title": "Palindroomchecker",
+    "language": "python",
+    "level": "beginner",
+    "description": "Schrijf een functie is_palindroom(tekst) die True teruggeeft als de tekst hetzelfde leest van voor naar achter als van achter naar voor (bijv. 'racecar'), en anders False.",
+    "learningGoals": [
+      "functies definiëren",
+      "strings bewerken",
+      "waarden vergelijken",
+      "booleans teruggeven"
+    ],
+    "hints": [
+      "Wat betekent 'palindroom' precies? Bedenk een voorbeeld dat wél en eentje dat niet voldoet.",
+      "Hoe zou je een tekst kunnen omdraaien in jouw taal?",
+      "Als je de omgedraaide tekst hebt, hoe vergelijk je die met het origineel?",
+      "Wat moet de functie teruggeven in beide gevallen?"
+    ],
+    "starterCode": "def is_palindroom(tekst):\n    # jouw code hier\n    pass\n",
+    "solutionNotes": "Verwachte aanpak: vergelijk tekst met de omgekeerde tekst (in Python: tekst[::-1] == tekst). Veelgemaakte fouten: vergeten te 'return'-en (alleen printen), of de vergelijking omdraaien. Hoofdletters/spaties hoeven niet genegeerd te worden voor deze opgave.",
+    "functionName": "is_palindroom",
+    "tests": [
+      {
+        "args": [
+          "racecar"
+        ],
+        "expected": true
+      },
+      {
+        "args": [
+          "appel"
+        ],
+        "expected": false
+      },
+      {
+        "args": [
+          "aha"
+        ],
+        "expected": true
+      },
+      {
+        "args": [
+          ""
+        ],
+        "expected": true
+      }
+    ],
+    "createdAt": "2026-06-25T22:00:00.000Z",
+    "updatedAt": "2026-06-25T22:00:00.000Z"
+  },
+  {
+    "id": "seed-fizzbuzz",
+    "title": "FizzBuzz (functie)",
+    "language": "javascript",
+    "level": "beginner",
+    "description": "Schrijf een functie fizzbuzz(n) die voor één getal de juiste tekst teruggeeft: 'Fizz' bij een veelvoud van 3, 'Buzz' bij een veelvoud van 5, 'FizzBuzz' bij een veelvoud van zowel 3 als 5, en anders het getal zelf als tekst (bijv. '7').",
+    "learningGoals": [
+      "de modulo-operator",
+      "if/else",
+      "volgorde van voorwaarden",
+      "waarden teruggeven als string"
+    ],
+    "hints": [
+      "Hoe controleer je of een getal deelbaar is door 3? (denk aan de rest na deling)",
+      "In welke volgorde moet je de voorwaarden checken zodat 15 'FizzBuzz' wordt en niet alleen 'Fizz'?",
+      "Wat geef je terug als geen enkele voorwaarde waar is?"
+    ],
+    "starterCode": "function fizzbuzz(n) {\n  // jouw code hier\n}\n",
+    "solutionNotes": "Verwachte aanpak: eerst n % 15 (of n%3 && n%5) checken, dán n%3, dán n%5, anders String(n). Veelgemaakte fout: de 'FizzBuzz'-case als laatste zetten, waardoor 15 alleen 'Fizz' wordt. Let op: het getal moet als string terug ('7', niet 7).",
+    "functionName": "fizzbuzz",
+    "tests": [
+      {
+        "args": [
+          3
+        ],
+        "expected": "Fizz"
+      },
+      {
+        "args": [
+          5
+        ],
+        "expected": "Buzz"
+      },
+      {
+        "args": [
+          15
+        ],
+        "expected": "FizzBuzz"
+      },
+      {
+        "args": [
+          7
+        ],
+        "expected": "7"
+      }
+    ],
+    "createdAt": "2026-06-25T22:00:00.000Z",
+    "updatedAt": "2026-06-25T22:00:00.000Z"
+  }
+]

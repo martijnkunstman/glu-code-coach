@@ -1,0 +1,14 @@
+# Alles wat NIET in het .vsix-pakket hoort.
+# De extensie is sleutel-vrij en dependency-vrij: enkel de coach-client gaat mee.
+
+server/**
+node_modules/**
+package-lock.json
+.vscode/**
+.claude/**
+.git/**
+**/*.vsix
+_*.js
+*.log
+.DS_Store
+.vscodeignore

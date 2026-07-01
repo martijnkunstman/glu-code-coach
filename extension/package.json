@@ -1,0 +1,115 @@
+{
+  "name": "glu-code-coach",
+  "displayName": "GLU Code Coach",
+  "description": "Een chatpaneel dat studenten stap voor stap begeleidt bij het voltooien van een programmeeropdracht.",
+  "version": "0.0.4",
+  "publisher": "learningtour",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Education",
+    "Other"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "studentCoach.resetChat",
+        "title": "GLU Code Coach: Gesprek opnieuw beginnen"
+      },
+      {
+        "command": "studentCoach.testCode",
+        "title": "GLU Code Coach: Toets mijn code"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "studentCoachContainer",
+          "title": "GLU Code Coach",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "studentCoachContainer": [
+        {
+          "id": "studentCoach.chat",
+          "name": "Coach",
+          "type": "webview"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "GLU Code Coach",
+      "properties": {
+        "studentCoach.assignment": {
+          "type": "string",
+          "default": "Schrijf een functie isPalindroom(tekst) die true teruggeeft als de tekst een palindroom is.",
+          "description": "De opdracht waar de coach de student bij begeleidt."
+        },
+        "studentCoach.proactive": {
+          "type": "boolean",
+          "default": true,
+          "description": "Laat de coach actief meekijken in je code en proactief reageren op fouten."
+        },
+        "studentCoach.apiBaseUrl": {
+          "type": "string",
+          "default": "https://app.agenticlearning.eu/glu/embeddedcodingcoach",
+          "description": "Basis-URL van de school-server (opdrachten + coach). De student hoeft hier niets aan te wijzigen."
+        },
+        "studentCoach.proxyToken": {
+          "type": "string",
+          "default": "",
+          "description": "Optioneel proxy-token (komt overeen met PROXY_TOKEN op de server). Door een beheerder uit te rollen; de student hoeft dit niet in te vullen."
+        },
+        "studentCoach.language": {
+          "type": "string",
+          "default": "nl",
+          "enum": [
+            "nl",
+            "en",
+            "de"
+          ],
+          "enumDescriptions": [
+            "Nederlands",
+            "English",
+            "Deutsch"
+          ],
+          "description": "Taal waarin de coach antwoordt. Te wisselen in het paneel (⚙️)."
+        },
+        "studentCoach.aiMode": {
+          "type": "string",
+          "default": "remote",
+          "enum": [
+            "remote",
+            "local"
+          ],
+          "enumDescriptions": [
+            "Remote: de coach draait via de school-server (admin kiest het model).",
+            "Lokaal: de coach draait op je eigen laptop via Ollama."
+          ],
+          "description": "Waar de AI-tutor draait. Te wisselen in het paneel."
+        },
+        "studentCoach.ollamaUrl": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "URL van je lokale Ollama (alleen voor de lokale modus)."
+        },
+        "studentCoach.ollamaModel": {
+          "type": "string",
+          "default": "llama3.1",
+          "description": "Welk Ollama-model de lokale tutor gebruikt (bijv. llama3.1, qwen2.5-coder). Installeer met 'ollama pull <model>'."
+        },
+        "studentCoach.pythonPath": {
+          "type": "string",
+          "default": "python3",
+          "description": "Pad/commando naar Python voor 'Toets mijn code' (op Windows vaak 'python')."
+        }
+      }
+    }
+  },
+  "scripts": {}
+}

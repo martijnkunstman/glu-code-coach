@@ -1,0 +1,312 @@
+:root {
+  --gap: 10px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-foreground);
+  background: var(--vscode-sideBar-background);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--gap) var(--gap) 0;
+}
+.header .title { font-weight: 600; font-size: 0.9em; }
+.toggle {
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+  background: transparent;
+  color: var(--vscode-descriptionForeground, var(--vscode-foreground));
+  border-radius: 14px;
+  padding: 3px 9px;
+  font-size: 0.75em;
+  cursor: pointer;
+}
+.toggle.on {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border-color: transparent;
+}
+
+.picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: var(--gap) var(--gap) 0;
+}
+.picker label {
+  font-size: 0.78em;
+  font-weight: 600;
+  color: var(--vscode-descriptionForeground, var(--vscode-foreground));
+  white-space: nowrap;
+}
+.picker select {
+  flex: 1;
+  font: inherit;
+  font-size: 0.85em;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--vscode-dropdown-border, var(--vscode-input-border, transparent));
+  background: var(--vscode-dropdown-background, var(--vscode-input-background));
+  color: var(--vscode-dropdown-foreground, var(--vscode-foreground));
+}
+.picker select:focus { outline: 1px solid var(--vscode-focusBorder); }
+
+.header-actions { display: flex; gap: 6px; align-items: center; }
+
+/* ---- Instellingenscherm ---- */
+.configpanel {
+  padding: var(--gap);
+  margin: var(--gap);
+  border-radius: 8px;
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+}
+.configpanel h3 { margin: 0 0 10px; font-size: 1em; }
+.configpanel .cfg-label {
+  display: block;
+  font-size: 0.8em;
+  font-weight: 600;
+  margin: 10px 0 4px;
+  color: var(--vscode-descriptionForeground, var(--vscode-foreground));
+}
+.configpanel select {
+  width: 100%;
+  font: inherit;
+  font-size: 0.88em;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--vscode-dropdown-border, var(--vscode-input-border, transparent));
+  background: var(--vscode-dropdown-background, var(--vscode-input-background));
+  color: var(--vscode-dropdown-foreground, var(--vscode-foreground));
+}
+.ollama-status {
+  margin: 10px 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 0.85em;
+  line-height: 1.4;
+}
+.ollama-status.ok { background: var(--vscode-inputValidation-infoBackground, rgba(20,184,166,.15)); }
+.ollama-status.bad { background: var(--vscode-inputValidation-warningBackground, rgba(239,108,57,.15)); }
+.ollama-status code {
+  background: var(--vscode-textCodeBlock-background, rgba(127,127,127,0.2));
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+#ollamaRefresh { margin-top: 8px; }
+.cfg-actions { display: flex; gap: 8px; margin-top: 16px; }
+.cfg-actions .test-btn { width: auto; flex: 1; }
+
+.assignment-title {
+  display: block;
+  font-weight: 600;
+  margin: 2px 0 4px;
+}
+
+.assignment {
+  padding: var(--gap);
+  margin: var(--gap) var(--gap) 0;
+  border-radius: 6px;
+  background: var(--vscode-textBlockQuote-background);
+  border-left: 3px solid var(--vscode-textLink-foreground);
+  font-size: 0.85em;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+.assignment::before {
+  content: "📋 Opdracht";
+  display: block;
+  font-weight: 600;
+  margin-bottom: 4px;
+  opacity: 0.8;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--gap);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.bubble {
+  max-width: 92%;
+  padding: 8px 11px;
+  border-radius: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  animation: pop 0.15s ease-out;
+}
+
+@keyframes pop {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+.bubble.coach {
+  align-self: flex-start;
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-bottom-left-radius: 3px;
+}
+
+.bubble code {
+  font-family: var(--vscode-editor-font-family, monospace);
+  background: var(--vscode-textCodeBlock-background, rgba(127,127,127,0.2));
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.92em;
+}
+
+.bubble.observation {
+  background: var(--vscode-inputValidation-warningBackground, var(--vscode-input-background));
+  border: 1px solid var(--vscode-inputValidation-warningBorder, var(--vscode-textLink-foreground));
+  border-left-width: 3px;
+  font-size: 0.92em;
+}
+
+.bubble.user {
+  align-self: flex-end;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border-bottom-right-radius: 3px;
+}
+
+.bubble.typing {
+  display: inline-flex;
+  gap: 4px;
+}
+.bubble.typing span {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--vscode-foreground);
+  opacity: 0.4;
+  animation: blink 1.2s infinite;
+}
+.bubble.typing span:nth-child(2) { animation-delay: 0.2s; }
+.bubble.typing span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink { 0%, 60%, 100% { opacity: 0.2; } 30% { opacity: 0.9; } }
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 var(--gap);
+}
+.chip {
+  border: 1px solid var(--vscode-button-secondaryBackground, var(--vscode-input-border));
+  background: var(--vscode-button-secondaryBackground, transparent);
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  border-radius: 14px;
+  padding: 4px 10px;
+  font-size: 0.8em;
+  cursor: pointer;
+}
+.chip:hover { background: var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground)); }
+
+/* ---- Codeblokken & lijsten in bubbels ---- */
+.bubble .codeblock {
+  margin: 6px 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--vscode-textCodeBlock-background, rgba(127,127,127,0.15));
+  overflow-x: auto;
+}
+.bubble .codeblock code {
+  background: none;
+  padding: 0;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 0.88em;
+  white-space: pre;
+}
+.bubble ul, .bubble ol { margin: 4px 0; padding-left: 20px; }
+.bubble li { margin: 2px 0; }
+
+/* ---- Toets-knop ---- */
+.testbar { padding: 0 var(--gap) var(--gap); }
+.test-btn {
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  padding: 9px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
+}
+.test-btn:hover { filter: brightness(1.06); }
+.test-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* ---- Toets-resultaat ---- */
+.bubble.testcard {
+  align-self: stretch;
+  max-width: 100%;
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+}
+.test-head { font-weight: 600; margin-bottom: 6px; }
+.test-head.good { color: #15803d; }
+.test-head.bad { color: #b45309; }
+.test-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 0;
+  border-top: 1px solid var(--vscode-panel-border, rgba(127,127,127,0.15));
+  font-size: 0.9em;
+}
+.test-row .ic { font-weight: 700; }
+.test-row.pass .ic { color: #15803d; }
+.test-row.fail .ic { color: #dc2626; }
+.test-detail { flex-basis: 100%; padding-left: 18px; opacity: 0.85; font-size: 0.95em; }
+.test-row code {
+  font-family: var(--vscode-editor-font-family, monospace);
+  background: var(--vscode-textCodeBlock-background, rgba(127,127,127,0.15));
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.composer {
+  display: flex;
+  gap: 6px;
+  padding: var(--gap);
+  border-top: 1px solid var(--vscode-panel-border, transparent);
+}
+#input {
+  flex: 1;
+  resize: none;
+  max-height: 120px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--vscode-input-border, transparent);
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font-family: inherit;
+  font-size: inherit;
+}
+#input:focus { outline: 1px solid var(--vscode-focusBorder); }
+#send {
+  border: none;
+  border-radius: 6px;
+  padding: 0 12px;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  cursor: pointer;
+}
+#send:hover { background: var(--vscode-button-hoverBackground); }
+#send:disabled { opacity: 0.5; cursor: default; }
