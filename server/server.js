@@ -9,6 +9,7 @@
 //                      POST/PUT/DELETE                 (docent — auth indien ingesteld)
 //                      GET  {BASE}/api/export        -> alles als JSON (docent)
 //                      POST {BASE}/api/import        -> alles vervangen (docent)
+//                      GET  {BASE}/api/usage          -> coach-gebruiksstatistieken (docent)
 //                      POST {BASE}/api/login         -> {password}
 //                      POST {BASE}/api/logout
 //                      GET  {BASE}/api/me            -> {authRequired, authed}
@@ -20,22 +21,60 @@
 //   DATA_FILE        (default ./data/assignments.json)
 //   TEACHER_PASSWORD (leeg = geen login vereist; gezet = docent moet inloggen
 //                     voordat hij opdrachten kan wijzigen)
+//   COACH_PROVIDER   "anthropic" of "gemini" (leeg = automatisch: gemini als
+//                     alleen GEMINI_API_KEY gezet is, anders anthropic)
+//   ANTHROPIC_API_KEY / COACH_MODEL   (default model claude-sonnet-4-6)
+//   GEMINI_API_KEY    / GEMINI_MODEL (default model gemini-flash-latest)
+//   USAGE_LOG_FILE   (default ./data/usage.log) — JSON Lines log van coach-aanroepen
 
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
+// Laadt server/.env (indien aanwezig) in process.env, zonder externe dependency.
+// Bestaande omgevingsvariabelen hebben voorrang boven waarden uit .env.
+function loadEnvFile(file) {
+  if (!fs.existsSync(file)) return;
+  for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    let value = trimmed.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (!(key in process.env)) process.env[key] = value;
+  }
+}
+loadEnvFile(path.join(__dirname, ".env"));
+
 const PORT = parseInt(process.env.PORT || "3001", 10);
 const BASE_PATH = (process.env.BASE_PATH || "/glu/embeddedcodingcoach").replace(/\/$/, "");
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, "data", "assignments.json");
+const USAGE_LOG_FILE = process.env.USAGE_LOG_FILE || path.join(__dirname, "data", "usage.log");
 const PUBLIC_DIR = path.join(__dirname, "public");
 const TEACHER_PASSWORD = process.env.TEACHER_PASSWORD || "";
 
-// --- Claude (server-side; de student heeft GEEN eigen sleutel nodig) ---
+// --- LLM-coach (server-side; de student heeft GEEN eigen sleutel nodig) ---
+// Ondersteunt Claude (Anthropic) en Gemini (Google). COACH_PROVIDER kiest welke:
+// "anthropic" of "gemini". Leeg = automatisch (gemini als alleen GEMINI_API_KEY
+// gezet is, anders anthropic).
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const COACH_MODEL = process.env.COACH_MODEL || "claude-sonnet-4-6";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
+const COACH_PROVIDER = (
+  process.env.COACH_PROVIDER || (!ANTHROPIC_API_KEY && GEMINI_API_KEY ? "gemini" : "anthropic")
+).trim().toLowerCase();
+const COACH_API_KEY = COACH_PROVIDER === "gemini" ? GEMINI_API_KEY : ANTHROPIC_API_KEY;
 // Optioneel: beperk wie de coach-proxy mag gebruiken (header x-proxy-token).
 // Leeg = open (handig in een afgeschermd schoolnetwerk).
 const PROXY_TOKEN = process.env.PROXY_TOKEN || "";
@@ -114,6 +153,63 @@ function loadAssignments() {
 function saveAssignments(list) {
   fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
   fs.writeFileSync(DATA_FILE, JSON.stringify(list, null, 2), "utf8");
+}
+
+// ---------------------------------------------------------------------------
+// Gebruikslogging (coach-aanroepen) — append-only JSON Lines bestand.
+// Elke regel is één JSON-object (ts, type, provider, model, tokens, ...).
+// Dat is voor dit soort volumes (klaslokaal, geen concurrent writers-probleem
+// zoals bij één gedeelde JSON-array) simpeler en robuuster dan een database:
+// append-only, leesbaar met `jq`/`tail`, en nooit corrupt door een halve write.
+// ---------------------------------------------------------------------------
+function logUsage(entry) {
+  const line = JSON.stringify({ ts: new Date().toISOString(), ...entry }) + "\n";
+  fs.mkdirSync(path.dirname(USAGE_LOG_FILE), { recursive: true });
+  fs.appendFile(USAGE_LOG_FILE, line, (err) => {
+    if (err) console.error("Kon gebruikslog niet schrijven:", err.message);
+  });
+}
+function loadUsageLog() {
+  try {
+    return fs
+      .readFileSync(USAGE_LOG_FILE, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+function summarizeUsage(entries) {
+  const summary = {
+    total: entries.length,
+    ok: 0,
+    errors: 0,
+    byProvider: {},
+    byType: {},
+    byDay: {},
+    tokens: { input: 0, output: 0 },
+  };
+  for (const e of entries) {
+    if (e.ok === false) summary.errors++;
+    else summary.ok++;
+    if (e.provider) summary.byProvider[e.provider] = (summary.byProvider[e.provider] || 0) + 1;
+    if (e.type) summary.byType[e.type] = (summary.byType[e.type] || 0) + 1;
+    const day = String(e.ts || "").slice(0, 10);
+    if (day) summary.byDay[day] = (summary.byDay[day] || 0) + 1;
+    if (e.usage) {
+      summary.tokens.input += e.usage.inputTokens || 0;
+      summary.tokens.output += e.usage.outputTokens || 0;
+    }
+  }
+  return summary;
 }
 
 const toLines = (v) =>
@@ -212,7 +308,7 @@ async function anthropic(body) {
   });
 }
 
-/** Eén niet-streamend antwoord; geeft de platte tekst terug. */
+/** Eén niet-streamend antwoord; geeft { text, usage } terug. */
 async function anthropicText(system, messages, maxTokens) {
   const r = await anthropic({ model: COACH_MODEL, max_tokens: maxTokens, system, messages });
   if (!r.ok) {
@@ -221,14 +317,19 @@ async function anthropicText(system, messages, maxTokens) {
     throw new Error("De coach is even niet beschikbaar (" + r.status + ").");
   }
   const data = await r.json();
-  return (data.content || [])
+  const text = (data.content || [])
     .filter((b) => b.type === "text")
     .map((b) => b.text)
     .join("")
     .trim();
+  const usage = data.usage
+    ? { inputTokens: data.usage.input_tokens || 0, outputTokens: data.usage.output_tokens || 0 }
+    : null;
+  return { text, usage };
 }
 
-/** Streamt het antwoord als simpele SSE naar de client: data:{"text":"…"} / data:{"done":true}. */
+/** Streamt het antwoord als simpele SSE naar de client: data:{"text":"…"} / data:{"done":true}.
+ *  Geeft na afloop { usage, error } terug (voor gebruikslogging). */
 async function anthropicStream(res, system, messages, maxTokens) {
   res.writeHead(200, {
     "Content-Type": "text/event-stream; charset=utf-8",
@@ -243,20 +344,24 @@ async function anthropicStream(res, system, messages, maxTokens) {
     upstream = await anthropic({ model: COACH_MODEL, max_tokens: maxTokens, system, messages, stream: true });
   } catch (e) {
     emit({ error: "Kon de coach niet bereiken: " + e.message });
-    return res.end();
+    res.end();
+    return { usage: null, error: e.message };
   }
   if (!upstream.ok || !upstream.body) {
     const t = await upstream.text().catch(() => "");
     console.error("Anthropic chat-fout", upstream.status, t.slice(0, 300));
     emit({ error: "De coach is even niet beschikbaar (" + upstream.status + "). Probeer het zo opnieuw." });
     emit({ done: true });
-    return res.end();
+    res.end();
+    return { usage: null, error: "HTTP " + upstream.status };
   }
 
   // Anthropic SSE parsen en alleen tekst-delta's doorsturen.
   const reader = upstream.body.getReader();
   const decoder = new TextDecoder();
   let buf = "";
+  const usage = { inputTokens: 0, outputTokens: 0 };
+  let streamError = null;
   try {
     while (true) {
       const { value, done } = await reader.read();
@@ -273,8 +378,14 @@ async function anthropicStream(res, system, messages, maxTokens) {
           const ev = JSON.parse(payload);
           if (ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta") {
             emit({ text: ev.delta.text });
+          } else if (ev.type === "message_start" && ev.message && ev.message.usage) {
+            usage.inputTokens = ev.message.usage.input_tokens || 0;
+            usage.outputTokens = ev.message.usage.output_tokens || 0;
+          } else if (ev.type === "message_delta" && ev.usage) {
+            usage.outputTokens = ev.usage.output_tokens || usage.outputTokens;
           } else if (ev.type === "error") {
-            emit({ error: (ev.error && ev.error.message) || "onbekende fout" });
+            streamError = (ev.error && ev.error.message) || "onbekende fout";
+            emit({ error: streamError });
           }
         } catch {
           /* onvolledige regel; negeren */
@@ -282,10 +393,145 @@ async function anthropicStream(res, system, messages, maxTokens) {
       }
     }
   } catch (e) {
+    streamError = e.message;
     emit({ error: "Streamfout: " + e.message });
   }
   emit({ done: true });
   res.end();
+  return { usage, error: streamError };
+}
+
+// ---------------------------------------------------------------------------
+// Gemini-aanroep (server-side). Vereist Node 18+ (global fetch).
+// ---------------------------------------------------------------------------
+function toGeminiContents(messages) {
+  return messages.map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: String(m.content || "") }],
+  }));
+}
+
+/** Eén niet-streamend antwoord; geeft { text, usage } terug. */
+async function geminiText(system, messages, maxTokens) {
+  const url = `${GEMINI_BASE_URL}/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: system }] },
+      contents: toGeminiContents(messages),
+      generationConfig: { maxOutputTokens: maxTokens },
+    }),
+  });
+  if (!r.ok) {
+    const t = await r.text().catch(() => "");
+    console.error("Gemini review-fout", r.status, t.slice(0, 300));
+    throw new Error("De coach is even niet beschikbaar (" + r.status + ").");
+  }
+  const data = await r.json();
+  const parts = (data.candidates?.[0]?.content?.parts) || [];
+  const text = parts.map((p) => p.text || "").join("").trim();
+  const usage = data.usageMetadata
+    ? {
+        inputTokens: data.usageMetadata.promptTokenCount || 0,
+        outputTokens: data.usageMetadata.candidatesTokenCount || 0,
+      }
+    : null;
+  return { text, usage };
+}
+
+/** Streamt het antwoord als simpele SSE naar de client: data:{"text":"…"} / data:{"done":true}.
+ *  Geeft na afloop { usage, error } terug (voor gebruikslogging). */
+async function geminiStream(res, system, messages, maxTokens) {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "Access-Control-Allow-Origin": "*",
+  });
+  const emit = (obj) => res.write("data: " + JSON.stringify(obj) + "\n\n");
+
+  const url = `${GEMINI_BASE_URL}/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
+  let upstream;
+  try {
+    upstream = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents: toGeminiContents(messages),
+        generationConfig: { maxOutputTokens: maxTokens },
+      }),
+    });
+  } catch (e) {
+    emit({ error: "Kon de coach niet bereiken: " + e.message });
+    res.end();
+    return { usage: null, error: e.message };
+  }
+  if (!upstream.ok || !upstream.body) {
+    const t = await upstream.text().catch(() => "");
+    console.error("Gemini chat-fout", upstream.status, t.slice(0, 300));
+    emit({ error: "De coach is even niet beschikbaar (" + upstream.status + "). Probeer het zo opnieuw." });
+    emit({ done: true });
+    res.end();
+    return { usage: null, error: "HTTP " + upstream.status };
+  }
+
+  // Gemini SSE parsen (alt=sse) en alleen tekst-delta's doorsturen.
+  const reader = upstream.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  const usage = { inputTokens: 0, outputTokens: 0 };
+  let streamError = null;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n")) !== -1) {
+        const line = buf.slice(0, idx).trim();
+        buf = buf.slice(idx + 1);
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (!payload) continue;
+        try {
+          const ev = JSON.parse(payload);
+          const parts = ev.candidates?.[0]?.content?.parts || [];
+          const text = parts.map((p) => p.text || "").join("");
+          if (text) emit({ text });
+          if (ev.usageMetadata) {
+            usage.inputTokens = ev.usageMetadata.promptTokenCount || 0;
+            usage.outputTokens = ev.usageMetadata.candidatesTokenCount || 0;
+          }
+          if (ev.error) {
+            streamError = ev.error.message || "onbekende fout";
+            emit({ error: streamError });
+          }
+        } catch {
+          /* onvolledige regel; negeren */
+        }
+      }
+    }
+  } catch (e) {
+    streamError = e.message;
+    emit({ error: "Streamfout: " + e.message });
+  }
+  emit({ done: true });
+  res.end();
+  return { usage, error: streamError };
+}
+
+/** Provider-onafhankelijke helpers die de router aanroept. */
+function coachText(system, messages, maxTokens) {
+  return COACH_PROVIDER === "gemini"
+    ? geminiText(system, messages, maxTokens)
+    : anthropicText(system, messages, maxTokens);
+}
+function coachStream(res, system, messages, maxTokens) {
+  return COACH_PROVIDER === "gemini"
+    ? geminiStream(res, system, messages, maxTokens)
+    : anthropicStream(res, system, messages, maxTokens);
 }
 
 // ---------------------------------------------------------------------------
@@ -434,11 +680,12 @@ const server = http.createServer(async (req, res) => {
         ok: true,
         base: BASE_PATH,
         count: loadAssignments().length,
-        coachReady: !!ANTHROPIC_API_KEY,
+        coachReady: !!COACH_API_KEY,
+        coachProvider: COACH_PROVIDER,
       });
     }
 
-    // --- Coach-proxy: de server praat met Claude, de student heeft GEEN sleutel nodig ---
+    // --- Coach-proxy: de server praat met Claude of Gemini, de student heeft GEEN sleutel nodig ---
     if (apiPath === "/coach/chat" || apiPath === "/coach/review") {
       if (req.method !== "POST") return sendJson(res, 405, { error: "POST verwacht" });
       if (PROXY_TOKEN && req.headers["x-proxy-token"] !== PROXY_TOKEN) {
@@ -446,14 +693,17 @@ const server = http.createServer(async (req, res) => {
       }
       const lim = checkCoachLimits(req);
       if (!lim.ok) return sendJson(res, lim.code, { error: lim.msg });
-      if (!ANTHROPIC_API_KEY) {
+      if (!COACH_API_KEY) {
+        const missing = COACH_PROVIDER === "gemini" ? "GEMINI_API_KEY" : "ANTHROPIC_API_KEY";
         return sendJson(res, 503, {
-          error: "De coach is nog niet geconfigureerd (ANTHROPIC_API_KEY ontbreekt op de server).",
+          error: `De coach is nog niet geconfigureerd (${missing} ontbreekt op de server).`,
         });
       }
       const body = await readBody(req);
       if (!body) return sendJson(res, 400, { error: "Ongeldige JSON" });
       const a = loadAssignments().find((x) => x.id === body.assignmentId) || null;
+
+      const coachModel = COACH_PROVIDER === "gemini" ? GEMINI_MODEL : COACH_MODEL;
 
       if (apiPath === "/coach/chat") {
         if (!Array.isArray(body.messages) || !body.messages.length) {
@@ -468,7 +718,22 @@ const server = http.createServer(async (req, res) => {
           assignmentBlock(a) +
           (body.mode === "test" ? TEST_FEEDBACK_EXTRA : "") +
           langDir(body.lang);
-        return anthropicStream(res, system, body.messages, 1024);
+        const t0 = Date.now();
+        const { usage, error } = await coachStream(res, system, body.messages, 1024);
+        logUsage({
+          type: "chat",
+          provider: COACH_PROVIDER,
+          model: coachModel,
+          assignmentId: a ? a.id : null,
+          lang: body.lang || null,
+          mode: body.mode || null,
+          ip: clientIp(req),
+          ok: !error,
+          error: error || null,
+          usage,
+          latencyMs: Date.now() - t0,
+        });
+        return;
       }
       // /coach/review (niet-streamend, kort)
       const prompt =
@@ -477,10 +742,33 @@ const server = http.createServer(async (req, res) => {
         "Code die de student nu heeft:\n```\n" +
         String(body.code || "").slice(0, 6000) +
         "\n```";
+      const t0 = Date.now();
       try {
-        const text = await anthropicText(REVIEW_SYSTEM + langDir(body.lang), [{ role: "user", content: prompt }], 150);
+        const { text, usage } = await coachText(REVIEW_SYSTEM + langDir(body.lang), [{ role: "user", content: prompt }], 150);
+        logUsage({
+          type: "review",
+          provider: COACH_PROVIDER,
+          model: coachModel,
+          assignmentId: a ? a.id : null,
+          lang: body.lang || null,
+          ip: clientIp(req),
+          ok: true,
+          usage,
+          latencyMs: Date.now() - t0,
+        });
         return sendJson(res, 200, { text });
       } catch (e) {
+        logUsage({
+          type: "review",
+          provider: COACH_PROVIDER,
+          model: coachModel,
+          assignmentId: a ? a.id : null,
+          lang: body.lang || null,
+          ip: clientIp(req),
+          ok: false,
+          error: e.message,
+          latencyMs: Date.now() - t0,
+        });
         return sendJson(res, 502, { error: e.message });
       }
     }
@@ -503,6 +791,12 @@ const server = http.createServer(async (req, res) => {
     if (apiPath === "/export" && req.method === "GET") {
       if (!isAuthed(req)) return sendJson(res, 401, { error: "Niet ingelogd" });
       return sendJson(res, 200, loadAssignments());
+    }
+    // Coach-gebruiksstatistieken (docent)
+    if (apiPath === "/usage" && req.method === "GET") {
+      if (!isAuthed(req)) return sendJson(res, 401, { error: "Niet ingelogd" });
+      const entries = loadUsageLog();
+      return sendJson(res, 200, { summary: summarizeUsage(entries), recent: entries.slice(-200).reverse() });
     }
     if (apiPath === "/import" && req.method === "POST") {
       if (!isAuthed(req)) return sendJson(res, 401, { error: "Niet ingelogd" });
@@ -570,9 +864,11 @@ server.listen(PORT, () => {
   console.log(`GLU Coding Coach draait op http://localhost:${PORT}${BASE_PATH}/`);
   if (TEACHER_PASSWORD) console.log("Docent-login is ingeschakeld (TEACHER_PASSWORD gezet).");
   console.log(
-    ANTHROPIC_API_KEY
-      ? `Coach actief (model ${COACH_MODEL})${PROXY_TOKEN ? ", proxy-token vereist" : ""}.`
-      : "LET OP: ANTHROPIC_API_KEY niet gezet — de coach-chat werkt nog niet."
+    COACH_API_KEY
+      ? `Coach actief via ${COACH_PROVIDER} (model ${COACH_PROVIDER === "gemini" ? GEMINI_MODEL : COACH_MODEL})${
+          PROXY_TOKEN ? ", proxy-token vereist" : ""
+        }.`
+      : `LET OP: ${COACH_PROVIDER === "gemini" ? "GEMINI_API_KEY" : "ANTHROPIC_API_KEY"} niet gezet — de coach-chat werkt nog niet.`
   );
   console.log(
     "Limieten: " +
