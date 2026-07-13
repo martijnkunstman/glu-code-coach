@@ -4,6 +4,11 @@
   "description": "Een chatpaneel dat studenten stap voor stap begeleidt bij het voltooien van een programmeeropdracht.",
   "version": "0.0.4",
   "publisher": "learningtour",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/martijnkunstman/glu-code-coach.git",
+    "directory": "extension"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
