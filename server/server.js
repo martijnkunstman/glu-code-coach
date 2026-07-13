@@ -26,7 +26,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-const PORT = parseInt(process.env.PORT || "3000", 10);
+const PORT = parseInt(process.env.PORT || "3001", 10);
 const BASE_PATH = (process.env.BASE_PATH || "/glu/embeddedcodingcoach").replace(/\/$/, "");
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, "data", "assignments.json");
 const PUBLIC_DIR = path.join(__dirname, "public");
